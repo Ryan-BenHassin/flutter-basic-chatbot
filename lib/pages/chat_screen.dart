@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/chat_service.dart';
+import '../models/message.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -11,33 +12,87 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ChatService _chatService = ChatService();
+  final List<Message> _messages = [];
+  final ScrollController _scrollController = ScrollController();
   bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
 
   void _sendMessage() async {
     if (_messageController.text.isEmpty) return;
 
-    final message = _messageController.text;
+    final userMessage = _messageController.text;
     _messageController.clear();
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _messages.add(Message(content: userMessage, isUser: true));
+      _isLoading = true;
+    });
+    _scrollToBottom();
 
     try {
-      final response = await _chatService.sendMessage(message);
-      print('Response: $response');
-      
-      
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(response)),
-        );
+      final response = await _chatService.sendMessage(_messages);
+      setState(() {
+        _messages.add(Message(content: response, isUser: false));
+        _isLoading = false;
+      });
+      _scrollToBottom();
     } catch (e) {
-      
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
-    } finally {
-      
-        setState(() => _isLoading = false);
-      }
+      setState(() {
+        _messages.add(Message(
+          content: 'Error: Unable to get response : $e',
+          isUser: false,
+        ));
+        _isLoading = false;
+      });
+      _scrollToBottom();
+    }
+  }
+
+  Widget _buildMessageBubble(Message message) {
+    return Align(
+      alignment: message.isUser ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: EdgeInsets.fromLTRB(
+          message.isUser ? 64.0 : 16.0,
+          4.0,
+          message.isUser ? 16.0 : 64.0,
+          4.0,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: message.isUser
+              ? Theme.of(context).colorScheme.primary
+              : Theme.of(context).colorScheme.secondary.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          message.content,
+          style: TextStyle(
+            color: message.isUser
+                ? Colors.white
+                : Theme.of(context).textTheme.bodyLarge?.color,
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -47,42 +102,62 @@ class _ChatScreenState extends State<ChatScreen> {
         title: const Text('Chat Bot'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (_isLoading)
-                const CircularProgressIndicator()
-              else
-                const Text(
-                  'Ask me anything!',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+      body: Column(
+        children: [
+          Expanded(
+            child: ListView.builder(
+              controller: _scrollController,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              itemCount: _messages.length,
+              itemBuilder: (context, index) => _buildMessageBubble(_messages[index]),
+            ),
+          ),
+          if (_isLoading)
+            const Padding(
+              padding: EdgeInsets.all(8.0),
+              child: CircularProgressIndicator(),
+            ),
+          Container(
+            padding: const EdgeInsets.all(8.0),
+            decoration: BoxDecoration(
+              color: Theme.of(context).scaffoldBackgroundColor,
+              boxShadow: [
+                BoxShadow(
+                  offset: const Offset(0, -2),
+                  blurRadius: 4,
+                  color: Colors.black.withOpacity(0.1),
                 ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: _messageController,
-                decoration: InputDecoration(
-                  hintText: 'Type your message...',
-                  border: const OutlineInputBorder(),
-                  suffixIcon: IconButton(
+              ],
+            ),
+            child: SafeArea(
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _messageController,
+                      decoration: const InputDecoration(
+                        hintText: 'Type your message...',
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                      ),
+                      onSubmitted: (_) => _sendMessage(),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
                     icon: const Icon(Icons.send),
                     onPressed: _sendMessage,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
-                ),
-                onSubmitted: (_) => _sendMessage(),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _messageController.dispose();
-    super.dispose();
   }
 }

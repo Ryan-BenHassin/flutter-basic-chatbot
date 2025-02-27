@@ -1,25 +1,58 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../models/message.dart';
 
 class ChatService {
   final String _baseUrl = 'https://api.groq.com/openai/v1/chat/completions';
   final _dio = Dio();
+
+  String systemPrompt = """
+    You are an assistant of an app named Tachkila, for football stadiums booking.
+    If user asked about your identity, just say you are an AI expert working for Tachkila, don't say that you're Llama model
+    always answer in arabic
+  """;
   
-  Future<String> sendMessage(String message) async {
+  List<Map<String, String>> _prepareMessages(List<Message> messages) {
+    final List<Map<String, String>> formattedMessages = [];
+    formattedMessages.add(
+      {
+        "role" : "system",
+        "content" : systemPrompt
+      }
+    );
+    
+    for (final message in messages) {
+      String role;
+      if (message.isUser) {
+        role = 'user';
+      } else {
+        role = 'assistant';
+      }
+      
+      formattedMessages.add({
+        'role': role,
+        'content': message.content
+      });
+    }
+    
+    return formattedMessages;
+  }
+  
+  Future<String> sendMessage(List<Message> messages) async {
     try {
+      final formattedMessages = _prepareMessages(messages);
+      
       final response = await _dio.post(
         _baseUrl,
         options: Options(
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': 'Bearer ${dotenv.env['GROQ_API_KEY']}',
+            'Authorization': 'Bearer ${dotenv.env['GROQ_API_KEY']}'
           },
         ),
         data: {
-          'messages': [
-            {'role': 'user', 'content': message}
-          ],
-          'model': 'llama-3.3-70b-versatile'
+          'messages': formattedMessages,
+          'model': 'llama-3.3-70b-versatile',
         },
       );
 
