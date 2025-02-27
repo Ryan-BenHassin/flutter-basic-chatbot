@@ -42,7 +42,9 @@ class _ChatScreenState extends State<ChatScreen> {
     _messageController.clear();
 
     setState(() {
-      _messages.add(Message(content: userMessage, isUser: true));
+      Message newMessage = Message(content: userMessage, isUser: true);
+      _messages.add(newMessage);
+      
       _isLoading = true;
     });
     _scrollToBottom();
@@ -68,7 +70,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _buildMessageBubble(Message message) {
     return Align(
-      alignment: message.isUser ? Alignment.centerRight : Alignment.centerLeft,
+      alignment: (message.isUser) ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         margin: EdgeInsets.fromLTRB(
           message.isUser ? 64.0 : 16.0,
@@ -78,17 +80,17 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: message.isUser
-              ? Theme.of(context).colorScheme.primary
-              : Theme.of(context).colorScheme.secondary.withOpacity(0.1),
+          color: (message.isUser) 
+            ? Colors.blue[800] 
+            : Colors.grey[300],
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(
           message.content,
           style: TextStyle(
-            color: message.isUser
+            color: (message.isUser)
                 ? Colors.white
-                : Theme.of(context).textTheme.bodyLarge?.color,
+                : Colors.black,
           ),
         ),
       ),
@@ -109,7 +111,12 @@ class _ChatScreenState extends State<ChatScreen> {
               controller: _scrollController,
               padding: const EdgeInsets.symmetric(vertical: 8),
               itemCount: _messages.length,
-              itemBuilder: (context, index) => _buildMessageBubble(_messages[index]),
+              itemBuilder: (context, index) {
+
+                Message currentMessage = _messages[index];
+                
+                return _buildMessageBubble(currentMessage);
+              },
             ),
           ),
           if (_isLoading)
