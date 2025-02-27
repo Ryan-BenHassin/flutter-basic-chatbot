@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:record/record.dart';
+import 'package:path_provider/path_provider.dart';
 import '../services/chat_service.dart';
+import '../services/speech_service.dart';
 import '../models/message.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -12,15 +15,55 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ChatService _chatService = ChatService();
+  final SpeechService _speechService = SpeechService();
+  final _audioRecorder = AudioRecorder();
   final List<Message> _messages = [];
   final ScrollController _scrollController = ScrollController();
   bool _isLoading = false;
+  bool _isRecording = false;
+  String? _recordingPath;
 
   @override
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
+    _audioRecorder.dispose();
     super.dispose();
+  }
+
+  Future<void> _startRecording() async {
+    try {
+      if (await _audioRecorder.hasPermission()) {
+        final dir = await getTemporaryDirectory();
+        _recordingPath = '${dir.path}/audio_message.m4a';
+        
+        await _audioRecorder.start(
+          const RecordConfig(encoder: AudioEncoder.aacLc),
+          path: _recordingPath!,
+        );
+        
+        setState(() => _isRecording = true);
+      }
+    } catch (e) {
+      print('Error starting recording: $e');
+    }
+  }
+
+  Future<void> _stopRecording() async {
+    try {
+      await _audioRecorder.stop();
+      setState(() => _isRecording = false);
+
+      if (_recordingPath != null) {
+        setState(() => _isLoading = true);
+        final transcription = await _speechService.transcribeAudio(_recordingPath!);
+        _messageController.text = transcription;
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      print('Error stopping recording: $e');
+      setState(() => _isLoading = false);
+    }
   }
 
   void _scrollToBottom() {
@@ -132,6 +175,11 @@ class _ChatScreenState extends State<ChatScreen> {
             child: SafeArea(
               child: Row(
                 children: [
+                  IconButton(
+                    icon: Icon(_isRecording ? Icons.stop : Icons.mic),
+                    onPressed: _isRecording ? _stopRecording : _startRecording,
+                    color: _isRecording ? Colors.red : Theme.of(context).colorScheme.primary,
+                  ),
                   Expanded(
                     child: TextField(
                       controller: _messageController,

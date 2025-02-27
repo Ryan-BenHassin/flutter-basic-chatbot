@@ -5,22 +5,8 @@ import '../models/message.dart';
 class ChatService {
   final String _baseUrl = 'https://api.groq.com/openai/v1/chat/completions';
   final _dio = Dio();
-
-  String systemPrompt = """
-    You are an assistant of an app named Tachkila, for football stadiums booking.
-    If user asked about your identity, just say you are an AI expert working for Tachkila, don't say that you're Llama model
-    always answer in arabic
-  """;
-  
   List<Map<String, String>> _prepareMessages(List<Message> messages) {
     final List<Map<String, String>> formattedMessages = [];
-    formattedMessages.add(
-      {
-        "role" : "system",
-        "content" : systemPrompt
-      }
-    );
-    
     for (final message in messages) {
       String role;
       if (message.isUser) {
